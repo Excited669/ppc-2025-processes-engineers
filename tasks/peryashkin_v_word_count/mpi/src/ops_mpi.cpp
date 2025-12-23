@@ -16,9 +16,11 @@ struct LocalResult {
   char ends_with_word = 0;
 };
 
-LocalResult CountLocal(const std::string& part) {
+LocalResult CountLocal(const std::string &part) {
   LocalResult r{};
-  if (part.empty()) return r;
+  if (part.empty()) {
+    return r;
+  }
 
   r.starts_with_word = (std::isspace(static_cast<unsigned char>(part.front())) == 0);
   r.ends_with_word = (std::isspace(static_cast<unsigned char>(part.back())) == 0);
@@ -26,13 +28,15 @@ LocalResult CountLocal(const std::string& part) {
   bool prev_space = true;
   for (unsigned char ch : part) {
     const bool cur_space = (std::isspace(ch) != 0);
-    if (!cur_space && prev_space) ++r.count;
+    if (!cur_space && prev_space) {
+      ++r.count;
+    }
     prev_space = cur_space;
   }
   return r;
 }
 
-void MakeScatterPlan(int n, int size, std::vector<int>& counts, std::vector<int>& displs) {
+void MakeScatterPlan(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
   counts.assign(size, 0);
   displs.assign(size, 0);
 
@@ -49,7 +53,7 @@ void MakeScatterPlan(int n, int size, std::vector<int>& counts, std::vector<int>
 
 }  // namespace
 
-PeryashkinVWordCountMPI::PeryashkinVWordCountMPI(const InType& in) {
+PeryashkinVWordCountMPI::PeryashkinVWordCountMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput() = 0;
@@ -59,7 +63,9 @@ bool PeryashkinVWordCountMPI::ValidationImpl() {
   return GetOutput() == 0;
 }
 
-bool PeryashkinVWordCountMPI::PreProcessingImpl() { return true; }
+bool PeryashkinVWordCountMPI::PreProcessingImpl() {
+  return true;
+}
 
 bool PeryashkinVWordCountMPI::RunImpl() {
   int rank = 0, size = 0;
@@ -88,10 +94,10 @@ bool PeryashkinVWordCountMPI::RunImpl() {
   const int local_n = counts[rank];
   std::vector<char> local_buf(static_cast<std::size_t>(local_n));
 
-  const char* send_ptr = (rank == 0 && n > 0) ? input.data() : nullptr;
+  const char *send_ptr = (rank == 0 && n > 0) ? input.data() : nullptr;
 
-  MPI_Scatterv(send_ptr, counts.data(), displs.data(), MPI_CHAR,
-               local_buf.data(), local_n, MPI_CHAR, 0, MPI_COMM_WORLD);
+  MPI_Scatterv(send_ptr, counts.data(), displs.data(), MPI_CHAR, local_buf.data(), local_n, MPI_CHAR, 0,
+               MPI_COMM_WORLD);
 
   const std::string part(local_buf.begin(), local_buf.end());
   const LocalResult lr = CountLocal(part);
@@ -100,18 +106,20 @@ bool PeryashkinVWordCountMPI::RunImpl() {
   MPI_Reduce(&lr.count, &sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
   std::vector<char> all_flags;
-  if (rank == 0) all_flags.resize(static_cast<std::size_t>(2 * size), 0);
+  if (rank == 0) {
+    all_flags.resize(static_cast<std::size_t>(2 * size), 0);
+  }
 
   const char my_flags[2] = {lr.starts_with_word, lr.ends_with_word};
-  MPI_Gather(my_flags, 2, MPI_CHAR,
-             rank == 0 ? all_flags.data() : nullptr, 2, MPI_CHAR,
-             0, MPI_COMM_WORLD);
+  MPI_Gather(my_flags, 2, MPI_CHAR, rank == 0 ? all_flags.data() : nullptr, 2, MPI_CHAR, 0, MPI_COMM_WORLD);
 
   if (rank == 0) {
     for (int i = 1; i < size; ++i) {
       const char prev_end = all_flags[static_cast<std::size_t>(2 * (i - 1) + 1)];
       const char cur_begin = all_flags[static_cast<std::size_t>(2 * i)];
-      if (prev_end == 1 && cur_begin == 1) --sum;
+      if (prev_end == 1 && cur_begin == 1) {
+        --sum;
+      }
     }
     GetOutput() = sum;
   }
@@ -121,6 +129,8 @@ bool PeryashkinVWordCountMPI::RunImpl() {
   return true;
 }
 
-bool PeryashkinVWordCountMPI::PostProcessingImpl() { return true; }
+bool PeryashkinVWordCountMPI::PostProcessingImpl() {
+  return true;
+}
 
 }  // namespace peryashkin_v_word_count

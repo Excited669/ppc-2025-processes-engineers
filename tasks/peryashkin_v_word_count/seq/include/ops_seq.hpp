@@ -10,7 +10,7 @@ class PeryashkinVWordCountSEQ : public BaseTask {
   static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
     return ppc::task::TypeOfTask::kSEQ;
   }
-  explicit PeryashkinVWordCountSEQ(const InType& in);
+  explicit PeryashkinVWordCountSEQ(const InType &in);
 
  private:
   bool ValidationImpl() override;

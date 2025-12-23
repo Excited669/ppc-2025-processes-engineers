@@ -15,7 +15,9 @@ namespace peryashkin_v_word_count {
 
 class PeryashkinVWordCountRunFuncTests : public ppc::util::BaseRunFuncTests<InType, OutType, TestType> {
  public:
-  static std::string PrintTestParam(const TestType& p) { return std::get<0>(p); }
+  static std::string PrintTestParam(const TestType &p) {
+    return std::get<0>(p);
+  }
 
  protected:
   void SetUp() override {
@@ -32,13 +34,19 @@ class PeryashkinVWordCountRunFuncTests : public ppc::util::BaseRunFuncTests<InTy
     for (int i = 0; i < correct_; ++i) {
       s.push_back(' ');
       const int len = word_len(gen);
-      for (int j = 0; j < len; ++j) s.push_back(static_cast<char>(chars(gen)));
+      for (int j = 0; j < len; ++j) {
+        s.push_back(static_cast<char>(chars(gen)));
+      }
     }
     input_ = s;
   }
 
-  bool CheckTestOutputData(OutType& output_data) final { return output_data == correct_; }
-  InType GetTestInputData() final { return input_; }
+  bool CheckTestOutputData(OutType &output_data) final {
+    return output_data == correct_;
+  }
+  InType GetTestInputData() final {
+    return input_;
+  }
 
  private:
   InType input_;
@@ -51,10 +59,9 @@ TEST_P(PeryashkinVWordCountRunFuncTests, WordsCounting) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 3> kTestParam = {
-    std::make_tuple("Gen_1_word_seed_123", 123, 1),
-    std::make_tuple("Gen_7_word_seed_123", 123, 7),
-    std::make_tuple("Gen_1000_word_seed_123", 123, 1000)};
+const std::array<TestType, 3> kTestParam = {std::make_tuple("Gen_1_word_seed_123", 123, 1),
+                                            std::make_tuple("Gen_7_word_seed_123", 123, 7),
+                                            std::make_tuple("Gen_1000_word_seed_123", 123, 1000)};
 
 const auto kTasks = std::tuple_cat(
     ppc::util::AddFuncTask<PeryashkinVWordCountMPI, InType>(kTestParam, PPC_SETTINGS_peryashkin_v_word_count),

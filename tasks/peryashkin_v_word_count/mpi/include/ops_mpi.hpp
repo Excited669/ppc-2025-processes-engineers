@@ -10,7 +10,7 @@ class PeryashkinVWordCountMPI : public BaseTask {
   static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
     return ppc::task::TypeOfTask::kMPI;
   }
-  explicit PeryashkinVWordCountMPI(const InType& in);
+  explicit PeryashkinVWordCountMPI(const InType &in);
 
  private:
   bool ValidationImpl() override;
