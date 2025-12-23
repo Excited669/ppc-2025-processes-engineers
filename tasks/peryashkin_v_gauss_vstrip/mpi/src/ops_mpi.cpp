@@ -64,35 +64,39 @@ Layout MakeLayout(int n, int size, int rank) {
   return L;
 }
 
-int OwnerOfCol(const Layout& L, int j) {
+int OwnerOfCol(const Layout &L, int j) {
   for (int r = 0; r < L.size; ++r) {
     const int f = L.first[r];
     const int c = L.cols[r];
-    if (j >= f && j < f + c) return r;
+    if (j >= f && j < f + c) {
+      return r;
+    }
   }
   return -1;
 }
 
-bool IsMyCol(const Layout& L, int j) {
+bool IsMyCol(const Layout &L, int j) {
   return (j >= L.my_first) && (j < L.my_first + L.my_cols);
 }
 
-int LocalCol(const Layout& L, int j) { return j - L.my_first; }
+int LocalCol(const Layout &L, int j) {
+  return j - L.my_first;
+}
 
 struct LocalMat {
   int n{};
   int local_cols{};
   std::vector<double> a;  // n * local_cols
 
-  double& at(int row, int lcol) {
+  double &at(int row, int lcol) {
     return a[static_cast<std::size_t>(row) * static_cast<std::size_t>(local_cols) + static_cast<std::size_t>(lcol)];
   }
-  const double& at(int row, int lcol) const {
+  const double &at(int row, int lcol) const {
     return a[static_cast<std::size_t>(row) * static_cast<std::size_t>(local_cols) + static_cast<std::size_t>(lcol)];
   }
 };
 
-std::vector<double> PackForScatter(const Layout& L, const std::vector<double>& aug) {
+std::vector<double> PackForScatter(const Layout &L, const std::vector<double> &aug) {
   const int total = std::accumulate(L.sendcounts.begin(), L.sendcounts.end(), 0);
   std::vector<double> packed(static_cast<std::size_t>(total), 0.0);
 
@@ -105,8 +109,7 @@ std::vector<double> PackForScatter(const Layout& L, const std::vector<double>& a
       const int row_src = i * L.m;
       const int row_dst = off + i * c;
       for (int lc = 0; lc < c; ++lc) {
-        packed[static_cast<std::size_t>(row_dst + lc)] =
-            aug[static_cast<std::size_t>(row_src + (f + lc))];
+        packed[static_cast<std::size_t>(row_dst + lc)] = aug[static_cast<std::size_t>(row_src + (f + lc))];
       }
     }
   }
@@ -114,8 +117,10 @@ std::vector<double> PackForScatter(const Layout& L, const std::vector<double>& a
   return packed;
 }
 
-void SwapRows(LocalMat& M, int r1, int r2) {
-  if (r1 == r2) return;
+void SwapRows(LocalMat &M, int r1, int r2) {
+  if (r1 == r2) {
+    return;
+  }
   for (int lc = 0; lc < M.local_cols; ++lc) {
     std::swap(M.at(r1, lc), M.at(r2, lc));
   }
@@ -123,25 +128,32 @@ void SwapRows(LocalMat& M, int r1, int r2) {
 
 }  // namespace
 
-PeryashkinVGaussVStripMPI::PeryashkinVGaussVStripMPI(const InType& in) {
+PeryashkinVGaussVStripMPI::PeryashkinVGaussVStripMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput().clear();
 }
 
 bool PeryashkinVGaussVStripMPI::ValidationImpl() {
-  const auto& in = GetInput();
-  if (in.n <= 0) return false;
-  if (in.bandwidth < 0 || in.bandwidth >= in.n) return false;
+  const auto &in = GetInput();
+  if (in.n <= 0) {
+    return false;
+  }
+  if (in.bandwidth < 0 || in.bandwidth >= in.n) {
+    return false;
+  }
 
-  const std::size_t need =
-      static_cast<std::size_t>(in.n) * static_cast<std::size_t>(in.n + 1);
-  if (in.augmented_matrix.size() != need) return false;
+  const std::size_t need = static_cast<std::size_t>(in.n) * static_cast<std::size_t>(in.n + 1);
+  if (in.augmented_matrix.size() != need) {
+    return false;
+  }
 
   return GetOutput().empty();
 }
 
-bool PeryashkinVGaussVStripMPI::PreProcessingImpl() { return true; }
+bool PeryashkinVGaussVStripMPI::PreProcessingImpl() {
+  return true;
+}
 
 bool PeryashkinVGaussVStripMPI::RunImpl() {
   int rank = 0, size = 1;
@@ -161,12 +173,12 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
   M.a.assign(static_cast<std::size_t>(n) * static_cast<std::size_t>(L.my_cols), 0.0);
 
   std::vector<double> packed;
-  if (rank == 0) packed = PackForScatter(L, GetInput().augmented_matrix);
+  if (rank == 0) {
+    packed = PackForScatter(L, GetInput().augmented_matrix);
+  }
 
-  MPI_Scatterv(rank == 0 ? packed.data() : nullptr,
-               L.sendcounts.data(), L.displs.data(), MPI_DOUBLE,
-               M.a.data(), n * L.my_cols, MPI_DOUBLE,
-               0, MPI_COMM_WORLD);
+  MPI_Scatterv(rank == 0 ? packed.data() : nullptr, L.sendcounts.data(), L.displs.data(), MPI_DOUBLE, M.a.data(),
+               n * L.my_cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   const double eps = std::numeric_limits<double>::epsilon() * kEpsScale;
 
@@ -190,11 +202,15 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
           pivot_row = r;
         }
       }
-      if (best <= eps) pivot_row = -1;
+      if (best <= eps) {
+        pivot_row = -1;
+      }
     }
 
     MPI_Bcast(&pivot_row, 1, MPI_INT, owner_k, MPI_COMM_WORLD);
-    if (pivot_row < 0) return false;
+    if (pivot_row < 0) {
+      return false;
+    }
 
     SwapRows(M, k, pivot_row);
 
@@ -204,7 +220,9 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
     if (rank == owner_k) {
       const int lk = LocalCol(L, k);
       const double diag = M.at(k, lk);
-      if (std::abs(diag) <= eps) return false;
+      if (std::abs(diag) <= eps) {
+        return false;
+      }
 
       for (int i = k + 1; i <= row_end; ++i) {
         mult[static_cast<std::size_t>(i)] = M.at(i, lk) / diag;
@@ -219,17 +237,23 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
     const int col_end = std::min(n - 1, k + bw);
 
     auto update_col = [&](int j) {
-      if (!IsMyCol(L, j)) return;
+      if (!IsMyCol(L, j)) {
+        return;
+      }
       const int lj = LocalCol(L, j);
       const double pivot_val = M.at(k, lj);
       for (int i = k + 1; i <= row_end; ++i) {
         const double f = mult[static_cast<std::size_t>(i)];
-        if (std::abs(f) <= eps) continue;
+        if (std::abs(f) <= eps) {
+          continue;
+        }
         M.at(i, lj) -= f * pivot_val;
       }
     };
 
-    for (int j = k + 1; j <= col_end; ++j) update_col(j);
+    for (int j = k + 1; j <= col_end; ++j) {
+      update_col(j);
+    }
     update_col(n);  // RHS
   }
 
@@ -242,7 +266,9 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
 
     double part = 0.0;
     for (int j = k + 1; j <= col_end; ++j) {
-      if (!IsMyCol(L, j)) continue;
+      if (!IsMyCol(L, j)) {
+        continue;
+      }
       part += M.at(k, LocalCol(L, j)) * x[static_cast<std::size_t>(j)];
     }
 
@@ -250,7 +276,9 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
     MPI_Allreduce(&part, &sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     double bk = 0.0;
-    if (rank == owner_b) bk = M.at(k, LocalCol(L, n));
+    if (rank == owner_b) {
+      bk = M.at(k, LocalCol(L, n));
+    }
     MPI_Bcast(&bk, 1, MPI_DOUBLE, owner_b, MPI_COMM_WORLD);
 
     const int owner_k = OwnerOfCol(L, k);
@@ -264,7 +292,9 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
       }
     }
     MPI_Bcast(&xk, 1, MPI_DOUBLE, owner_k, MPI_COMM_WORLD);
-    if (!std::isfinite(xk)) return false;
+    if (!std::isfinite(xk)) {
+      return false;
+    }
 
     x[static_cast<std::size_t>(k)] = xk;
   }

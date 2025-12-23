@@ -54,7 +54,7 @@ class PeryashkinVGaussVStripPerfTests : public ppc::util::BaseRunPerfTests<InTyp
     expected_output_.assign(static_cast<std::size_t>(n), 1.0);
   }
 
-  bool CheckTestOutputData(OutType& output_data) final {
+  bool CheckTestOutputData(OutType &output_data) final {
     if (output_data.size() != expected_output_.size()) {
       return false;
     }
@@ -80,9 +80,8 @@ TEST_P(PeryashkinVGaussVStripPerfTests, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks =
-    ppc::util::MakeAllPerfTasks<InType, PeryashkinVGaussVStripMPI, PeryashkinVGaussVStripSEQ>(
-        PPC_SETTINGS_peryashkin_v_gauss_vstrip);
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, PeryashkinVGaussVStripMPI, PeryashkinVGaussVStripSEQ>(
+    PPC_SETTINGS_peryashkin_v_gauss_vstrip);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 

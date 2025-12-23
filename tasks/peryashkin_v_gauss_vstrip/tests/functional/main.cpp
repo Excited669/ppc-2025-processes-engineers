@@ -21,26 +21,30 @@ namespace peryashkin_v_gauss_vstrip {
 namespace {
 
 std::string Sanitize(std::string s) {
-  for (char& ch : s) {
+  for (char &ch : s) {
     const unsigned char u = static_cast<unsigned char>(ch);
-    if (std::isalnum(u) == 0 && ch != '_') ch = '_';
+    if (std::isalnum(u) == 0 && ch != '_') {
+      ch = '_';
+    }
   }
   return s;
 }
 
-GaussBandInput LoadSystem(const std::string& filename) {
+GaussBandInput LoadSystem(const std::string &filename) {
   GaussBandInput in;
-  const std::string abs =
-      ppc::util::GetAbsoluteTaskPath(PPC_ID_peryashkin_v_gauss_vstrip, filename);
+  const std::string abs = ppc::util::GetAbsoluteTaskPath(PPC_ID_peryashkin_v_gauss_vstrip, filename);
 
   std::ifstream fin(abs);
-  if (!fin.is_open()) throw std::runtime_error("Cannot open: " + abs);
+  if (!fin.is_open()) {
+    throw std::runtime_error("Cannot open: " + abs);
+  }
 
   fin >> in.n >> in.bandwidth;
-  if (in.n <= 0) throw std::runtime_error("Bad n in: " + abs);
+  if (in.n <= 0) {
+    throw std::runtime_error("Bad n in: " + abs);
+  }
 
-  const std::size_t total =
-      static_cast<std::size_t>(in.n) * static_cast<std::size_t>(in.n + 1);
+  const std::size_t total = static_cast<std::size_t>(in.n) * static_cast<std::size_t>(in.n + 1);
   in.augmented_matrix.assign(total, 0.0);
 
   for (std::size_t i = 0; i < total; ++i) {
@@ -51,11 +55,10 @@ GaussBandInput LoadSystem(const std::string& filename) {
   return in;
 }
 
-bool SolveDenseRef(std::vector<double> a, int n, std::vector<double>& x) {
+bool SolveDenseRef(std::vector<double> a, int n, std::vector<double> &x) {
   const double eps = 1e-12;
   auto id = [&](int r, int c) -> std::size_t {
-    return static_cast<std::size_t>(r) * static_cast<std::size_t>(n + 1) +
-           static_cast<std::size_t>(c);
+    return static_cast<std::size_t>(r) * static_cast<std::size_t>(n + 1) + static_cast<std::size_t>(c);
   };
 
   for (int k = 0; k < n; ++k) {
@@ -68,27 +71,39 @@ bool SolveDenseRef(std::vector<double> a, int n, std::vector<double>& x) {
         piv = r;
       }
     }
-    if (best < eps) return false;
+    if (best < eps) {
+      return false;
+    }
 
     if (piv != k) {
-      for (int c = k; c <= n; ++c) std::swap(a[id(k, c)], a[id(piv, c)]);
+      for (int c = k; c <= n; ++c) {
+        std::swap(a[id(k, c)], a[id(piv, c)]);
+      }
     }
 
     const double diag = a[id(k, k)];
     for (int r = k + 1; r < n; ++r) {
       const double f = a[id(r, k)] / diag;
-      if (std::fabs(f) < eps) continue;
+      if (std::fabs(f) < eps) {
+        continue;
+      }
       a[id(r, k)] = 0.0;
-      for (int c = k + 1; c <= n; ++c) a[id(r, c)] -= f * a[id(k, c)];
+      for (int c = k + 1; c <= n; ++c) {
+        a[id(r, c)] -= f * a[id(k, c)];
+      }
     }
   }
 
   x.assign(static_cast<std::size_t>(n), 0.0);
   for (int k = n - 1; k >= 0; --k) {
     double rhs = a[id(k, n)];
-    for (int c = k + 1; c < n; ++c) rhs -= a[id(k, c)] * x[static_cast<std::size_t>(c)];
+    for (int c = k + 1; c < n; ++c) {
+      rhs -= a[id(k, c)] * x[static_cast<std::size_t>(c)];
+    }
     const double diag = a[id(k, k)];
-    if (std::fabs(diag) < eps) return false;
+    if (std::fabs(diag) < eps) {
+      return false;
+    }
     x[static_cast<std::size_t>(k)] = rhs / diag;
   }
   return true;
@@ -96,18 +111,16 @@ bool SolveDenseRef(std::vector<double> a, int n, std::vector<double>& x) {
 
 }  // namespace
 
-class PeryashkinVGaussVStripFuncTests
-    : public ppc::util::BaseRunFuncTests<InType, OutType, TestType> {
+class PeryashkinVGaussVStripFuncTests : public ppc::util::BaseRunFuncTests<InType, OutType, TestType> {
  public:
-  static std::string PrintTestParam(const TestType& p) {
+  static std::string PrintTestParam(const TestType &p) {
     return Sanitize(std::to_string(std::get<0>(p)) + "_" + std::get<1>(p));
   }
 
  protected:
   void SetUp() override {
-    const TestType params =
-        std::get<static_cast<std::size_t>(ppc::util::GTestParamIndex::kTestParams)>(GetParam());
-    const std::string& file = std::get<1>(params);
+    const TestType params = std::get<static_cast<std::size_t>(ppc::util::GTestParamIndex::kTestParams)>(GetParam());
+    const std::string &file = std::get<1>(params);
 
     input_ = LoadSystem(file);
     if (!SolveDenseRef(input_.augmented_matrix, input_.n, expected_)) {
@@ -115,16 +128,22 @@ class PeryashkinVGaussVStripFuncTests
     }
   }
 
-  bool CheckTestOutputData(OutType& out) final {
-    if (out.size() != expected_.size()) return false;
+  bool CheckTestOutputData(OutType &out) final {
+    if (out.size() != expected_.size()) {
+      return false;
+    }
     const double tol = 1e-8;
     for (std::size_t i = 0; i < out.size(); ++i) {
-      if (std::fabs(out[i] - expected_[i]) > tol) return false;
+      if (std::fabs(out[i] - expected_[i]) > tol) {
+        return false;
+      }
     }
     return true;
   }
 
-  InType GetTestInputData() final { return input_; }
+  InType GetTestInputData() final {
+    return input_;
+  }
 
  private:
   InType input_;

@@ -9,7 +9,7 @@ class PeryashkinVGaussVStripSEQ : public BaseTask {
   static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
     return ppc::task::TypeOfTask::kSEQ;
   }
-  explicit PeryashkinVGaussVStripSEQ(const InType& in);
+  explicit PeryashkinVGaussVStripSEQ(const InType &in);
 
  private:
   bool ValidationImpl() override;

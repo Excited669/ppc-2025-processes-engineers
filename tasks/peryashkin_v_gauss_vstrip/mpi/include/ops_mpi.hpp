@@ -9,7 +9,7 @@ class PeryashkinVGaussVStripMPI : public BaseTask {
   static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
     return ppc::task::TypeOfTask::kMPI;
   }
-  explicit PeryashkinVGaussVStripMPI(const InType& in);
+  explicit PeryashkinVGaussVStripMPI(const InType &in);
 
  private:
   bool ValidationImpl() override;
