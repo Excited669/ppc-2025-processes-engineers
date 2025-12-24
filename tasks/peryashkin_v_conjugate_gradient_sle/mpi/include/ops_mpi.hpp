@@ -10,7 +10,7 @@ class PeryashkinVConjGradSleMPI : public BaseTask {
     return ppc::task::TypeOfTask::kMPI;
   }
 
-  explicit PeryashkinVConjGradSleMPI(const InType& in);
+  explicit PeryashkinVConjGradSleMPI(const InType &in);
 
  private:
   bool ValidationImpl() override;

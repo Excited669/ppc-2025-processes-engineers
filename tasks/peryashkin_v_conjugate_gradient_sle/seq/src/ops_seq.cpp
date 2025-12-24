@@ -7,7 +7,7 @@
 
 namespace peryashkin_v_conjugate_gradient_sle {
 
-PeryashkinVConjGradSleSEQ::PeryashkinVConjGradSleSEQ(const InType& in) {
+PeryashkinVConjGradSleSEQ::PeryashkinVConjGradSleSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput().clear();
@@ -25,20 +25,26 @@ bool PeryashkinVConjGradSleSEQ::PreProcessingImpl() {
 
 namespace {
 
-void ApplyA(const std::vector<double>& x, int variant, std::vector<double>* y) {
+void ApplyA(const std::vector<double> &x, int variant, std::vector<double> *y) {
   const std::size_t n = x.size();
   y->assign(n, 0.0);
 
   if (variant == 1) {
-    for (std::size_t i = 0; i < n; ++i) (*y)[i] = 5.0 * x[i];
+    for (std::size_t i = 0; i < n; ++i) {
+      (*y)[i] = 5.0 * x[i];
+    }
     return;
   }
 
   if (variant == 0) {
     for (std::size_t i = 0; i < n; ++i) {
       double v = 4.0 * x[i];
-      if (i > 0) v += x[i - 1];
-      if (i + 1 < n) v += x[i + 1];
+      if (i > 0) {
+        v += x[i - 1];
+      }
+      if (i + 1 < n) {
+        v += x[i + 1];
+      }
       (*y)[i] = v;
     }
     return;
@@ -48,18 +54,22 @@ void ApplyA(const std::vector<double>& x, int variant, std::vector<double>* y) {
   for (std::size_t i = 0; i < n; ++i) {
     const std::size_t j = n - 1 - i;
     double v = 3.0 * x[i];
-    if (j != i) v -= x[j];
+    if (j != i) {
+      v -= x[j];
+    }
     (*y)[i] = v;
   }
 }
 
-double Dot(const std::vector<double>& a, const std::vector<double>& b) {
+double Dot(const std::vector<double> &a, const std::vector<double> &b) {
   double s = 0.0;
-  for (std::size_t i = 0; i < a.size(); ++i) s += a[i] * b[i];
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    s += a[i] * b[i];
+  }
   return s;
 }
 
-void ConjugateGradient(int n, int variant, const std::vector<double>& b, std::vector<double>* x) {
+void ConjugateGradient(int n, int variant, const std::vector<double> &b, std::vector<double> *x) {
   const double eps = 1e-7;
   const int max_iters = std::max(2000, 2 * n);
 
@@ -70,17 +80,25 @@ void ConjugateGradient(int n, int variant, const std::vector<double>& b, std::ve
   double rr = Dot(r, r);
 
   for (int it = 0; it < max_iters; ++it) {
-    if (std::sqrt(rr) < eps) break;
+    if (std::sqrt(rr) < eps) {
+      break;
+    }
 
     ApplyA(p, variant, &Ap);
 
     const double pAp = Dot(p, Ap);
-    if (std::fabs(pAp) < 1e-15) break;
+    if (std::fabs(pAp) < 1e-15) {
+      break;
+    }
 
     const double alpha = rr / pAp;
 
-    for (int i = 0; i < n; ++i) (*x)[static_cast<std::size_t>(i)] += alpha * p[static_cast<std::size_t>(i)];
-    for (int i = 0; i < n; ++i) r[static_cast<std::size_t>(i)] -= alpha * Ap[static_cast<std::size_t>(i)];
+    for (int i = 0; i < n; ++i) {
+      (*x)[static_cast<std::size_t>(i)] += alpha * p[static_cast<std::size_t>(i)];
+    }
+    for (int i = 0; i < n; ++i) {
+      r[static_cast<std::size_t>(i)] -= alpha * Ap[static_cast<std::size_t>(i)];
+    }
 
     const double rr_new = Dot(r, r);
     const double beta = rr_new / rr;
@@ -98,7 +116,9 @@ void ConjugateGradient(int n, int variant, const std::vector<double>& b, std::ve
 
 bool PeryashkinVConjGradSleSEQ::RunImpl() {
   const auto [n, variant] = GetInput();
-  if (n <= 0) return false;
+  if (n <= 0) {
+    return false;
+  }
 
   std::vector<double> b(static_cast<std::size_t>(n), 1.0);
   std::vector<double> x(static_cast<std::size_t>(n), 0.0);

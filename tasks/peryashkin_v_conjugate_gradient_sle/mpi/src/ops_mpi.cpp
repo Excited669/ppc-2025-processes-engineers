@@ -9,7 +9,7 @@
 
 namespace peryashkin_v_conjugate_gradient_sle {
 
-PeryashkinVConjGradSleMPI::PeryashkinVConjGradSleMPI(const InType& in) {
+PeryashkinVConjGradSleMPI::PeryashkinVConjGradSleMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput().clear();
@@ -33,13 +33,15 @@ bool PeryashkinVConjGradSleMPI::ValidationImpl() {
 bool PeryashkinVConjGradSleMPI::PreProcessingImpl() {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank == 0) GetOutput().clear();
+  if (rank == 0) {
+    GetOutput().clear();
+  }
   return true;
 }
 
 namespace {
 
-void CalcRowDist(int n, int world_size, std::vector<int>* counts, std::vector<int>* displs) {
+void CalcRowDist(int n, int world_size, std::vector<int> *counts, std::vector<int> *displs) {
   counts->assign(world_size, 0);
   displs->assign(world_size, 0);
 
@@ -55,27 +57,23 @@ void CalcRowDist(int n, int world_size, std::vector<int>* counts, std::vector<in
   }
 }
 
-double LocalDot(const std::vector<double>& a, const std::vector<double>& b) {
+double LocalDot(const std::vector<double> &a, const std::vector<double> &b) {
   double s = 0.0;
-  for (std::size_t i = 0; i < a.size(); ++i) s += a[i] * b[i];
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    s += a[i] * b[i];
+  }
   return s;
 }
 
-void ApplyA_local(
-    int n,
-    int variant,
-    int rank,
-    int world_size,
-    int local_start,
-    const std::vector<int>& counts,
-    const std::vector<int>& displs,
-    const std::vector<double>& x_local,
-    std::vector<double>* y_local) {
+void ApplyA_local(int n, int variant, int rank, int world_size, int local_start, const std::vector<int> &counts,
+                  const std::vector<int> &displs, const std::vector<double> &x_local, std::vector<double> *y_local) {
   const int local_rows = static_cast<int>(x_local.size());
   y_local->assign(static_cast<std::size_t>(local_rows), 0.0);
 
   if (variant == 1) {
-    for (int i = 0; i < local_rows; ++i) (*y_local)[static_cast<std::size_t>(i)] = 5.0 * x_local[static_cast<std::size_t>(i)];
+    for (int i = 0; i < local_rows; ++i) {
+      (*y_local)[static_cast<std::size_t>(i)] = 5.0 * x_local[static_cast<std::size_t>(i)];
+    }
     return;
   }
 
@@ -91,14 +89,12 @@ void ApplyA_local(
     const double send_right = (local_rows > 0) ? x_local.back() : 0.0;
 
     // receive right ghost from right neighbor, send left boundary to left neighbor
-    MPI_Sendrecv(&send_left, 1, MPI_DOUBLE, left_rank, 10,
-                 &right_ghost, 1, MPI_DOUBLE, right_rank, 10,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(&send_left, 1, MPI_DOUBLE, left_rank, 10, &right_ghost, 1, MPI_DOUBLE, right_rank, 10, MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
 
     // receive left ghost from left neighbor, send right boundary to right neighbor
-    MPI_Sendrecv(&send_right, 1, MPI_DOUBLE, right_rank, 11,
-                 &left_ghost, 1, MPI_DOUBLE, left_rank, 11,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(&send_right, 1, MPI_DOUBLE, right_rank, 11, &left_ghost, 1, MPI_DOUBLE, left_rank, 11, MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
 
     for (int i = 0; i < local_rows; ++i) {
       const int global_i = local_start + i;
@@ -107,14 +103,20 @@ void ApplyA_local(
 
       // left neighbor
       if (global_i > 0) {
-        if (i > 0) v += x_local[static_cast<std::size_t>(i - 1)];
-        else v += left_ghost;
+        if (i > 0) {
+          v += x_local[static_cast<std::size_t>(i - 1)];
+        } else {
+          v += left_ghost;
+        }
       }
 
       // right neighbor
       if (global_i + 1 < n) {
-        if (i + 1 < local_rows) v += x_local[static_cast<std::size_t>(i + 1)];
-        else v += right_ghost;
+        if (i + 1 < local_rows) {
+          v += x_local[static_cast<std::size_t>(i + 1)];
+        } else {
+          v += right_ghost;
+        }
       }
 
       (*y_local)[static_cast<std::size_t>(i)] = v;
@@ -124,8 +126,7 @@ void ApplyA_local(
 
   // variant == 2: need x[n-1-i] -> allgather local x into global x
   std::vector<double> x_global(static_cast<std::size_t>(n), 0.0);
-  MPI_Allgatherv(x_local.data(), local_rows, MPI_DOUBLE,
-                 x_global.data(), counts.data(), displs.data(), MPI_DOUBLE,
+  MPI_Allgatherv(x_local.data(), local_rows, MPI_DOUBLE, x_global.data(), counts.data(), displs.data(), MPI_DOUBLE,
                  MPI_COMM_WORLD);
 
   for (int i = 0; i < local_rows; ++i) {
@@ -133,22 +134,17 @@ void ApplyA_local(
     const int j = n - 1 - global_i;
 
     double v = 3.0 * x_local[static_cast<std::size_t>(i)];
-    if (j != global_i) v -= x_global[static_cast<std::size_t>(j)];
+    if (j != global_i) {
+      v -= x_global[static_cast<std::size_t>(j)];
+    }
 
     (*y_local)[static_cast<std::size_t>(i)] = v;
   }
 }
 
-void ConjugateGradientMPI(
-    int n,
-    int variant,
-    int rank,
-    int world_size,
-    int local_start,
-    const std::vector<int>& counts,
-    const std::vector<int>& displs,
-    const std::vector<double>& b_local,
-    std::vector<double>* x_local) {
+void ConjugateGradientMPI(int n, int variant, int rank, int world_size, int local_start, const std::vector<int> &counts,
+                          const std::vector<int> &displs, const std::vector<double> &b_local,
+                          std::vector<double> *x_local) {
   const double eps = 1e-7;
   const int max_iters = std::max(2000, 2 * n);
 
@@ -163,14 +159,18 @@ void ConjugateGradientMPI(
   MPI_Allreduce(&rr_local, &rr, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
   for (int it = 0; it < max_iters; ++it) {
-    if (std::sqrt(rr) < eps) break;
+    if (std::sqrt(rr) < eps) {
+      break;
+    }
 
     ApplyA_local(n, variant, rank, world_size, local_start, counts, displs, p_local, &Ap_local);
 
     const double pAp_local = LocalDot(p_local, Ap_local);
     double pAp = 0.0;
     MPI_Allreduce(&pAp_local, &pAp, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    if (std::fabs(pAp) < 1e-15) break;
+    if (std::fabs(pAp) < 1e-15) {
+      break;
+    }
 
     const double alpha = rr / pAp;
 
@@ -212,7 +212,9 @@ bool PeryashkinVConjGradSleMPI::RunImpl() {
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&variant, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  if (n <= 0) return false;
+  if (n <= 0) {
+    return false;
+  }
 
   std::vector<int> counts;
   std::vector<int> displs;
@@ -223,13 +225,15 @@ bool PeryashkinVConjGradSleMPI::RunImpl() {
 
   // b = ones (root creates full, then scatter)
   std::vector<double> b_full;
-  if (rank == 0) b_full.assign(static_cast<std::size_t>(n), 1.0);
+  if (rank == 0) {
+    b_full.assign(static_cast<std::size_t>(n), 1.0);
+  }
 
   std::vector<double> b_local(static_cast<std::size_t>(local_rows), 0.0);
-  double* sendbuf = (rank == 0) ? b_full.data() : nullptr;
+  double *sendbuf = (rank == 0) ? b_full.data() : nullptr;
 
-  MPI_Scatterv(sendbuf, counts.data(), displs.data(), MPI_DOUBLE,
-               b_local.data(), local_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Scatterv(sendbuf, counts.data(), displs.data(), MPI_DOUBLE, b_local.data(), local_rows, MPI_DOUBLE, 0,
+               MPI_COMM_WORLD);
 
   std::vector<double> x_local(static_cast<std::size_t>(local_rows), 0.0);
 
@@ -237,20 +241,26 @@ bool PeryashkinVConjGradSleMPI::RunImpl() {
 
   // gather x to root
   std::vector<double> x_full;
-  if (rank == 0) x_full.assign(static_cast<std::size_t>(n), 0.0);
+  if (rank == 0) {
+    x_full.assign(static_cast<std::size_t>(n), 0.0);
+  }
 
-  double* recvbuf = (rank == 0) ? x_full.data() : nullptr;
-  MPI_Gatherv(x_local.data(), local_rows, MPI_DOUBLE,
-              recvbuf, counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  double *recvbuf = (rank == 0) ? x_full.data() : nullptr;
+  MPI_Gatherv(x_local.data(), local_rows, MPI_DOUBLE, recvbuf, counts.data(), displs.data(), MPI_DOUBLE, 0,
+              MPI_COMM_WORLD);
 
-  if (rank == 0) GetOutput() = std::move(x_full);
+  if (rank == 0) {
+    GetOutput() = std::move(x_full);
+  }
   return true;
 }
 
 bool PeryashkinVConjGradSleMPI::PostProcessingImpl() {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank == 0) return !GetOutput().empty();
+  if (rank == 0) {
+    return !GetOutput().empty();
+  }
   return true;
 }
 

@@ -10,7 +10,7 @@ class PeryashkinVConjGradSleSEQ : public BaseTask {
     return ppc::task::TypeOfTask::kSEQ;
   }
 
-  explicit PeryashkinVConjGradSleSEQ(const InType& in);
+  explicit PeryashkinVConjGradSleSEQ(const InType &in);
 
  private:
   bool ValidationImpl() override;
