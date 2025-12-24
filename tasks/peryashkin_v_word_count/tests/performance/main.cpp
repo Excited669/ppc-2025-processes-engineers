@@ -50,8 +50,10 @@ TEST_P(PeryashkinVWordCountRunPerfTests, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, PeryashkinVWordCountMPI, PeryashkinVWordCountSEQ>(
-    PPC_SETTINGS_peryashkin_v_word_count);
+const std::string kSettingsPath = "tasks/peryashkin_v_word_count/settings.json";
+
+const auto kAllPerfTasks =
+    ppc::util::MakeAllPerfTasks<InType, PeryashkinVWordCountMPI, PeryashkinVWordCountSEQ>(kSettingsPath);
 
 const auto kValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 const auto kName = PeryashkinVWordCountRunPerfTests::CustomPerfTestName;

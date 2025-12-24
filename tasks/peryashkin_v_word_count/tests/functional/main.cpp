@@ -63,9 +63,10 @@ const std::array<TestType, 3> kTestParam = {std::make_tuple("Gen_1_word_seed_123
                                             std::make_tuple("Gen_7_word_seed_123", 123, 7),
                                             std::make_tuple("Gen_1000_word_seed_123", 123, 1000)};
 
-const auto kTasks = std::tuple_cat(
-    ppc::util::AddFuncTask<PeryashkinVWordCountMPI, InType>(kTestParam, PPC_SETTINGS_peryashkin_v_word_count),
-    ppc::util::AddFuncTask<PeryashkinVWordCountSEQ, InType>(kTestParam, PPC_SETTINGS_peryashkin_v_word_count));
+const std::string kSettingsPath = "tasks/peryashkin_v_word_count/settings.json";
+
+const auto kTasks = std::tuple_cat(ppc::util::AddFuncTask<PeryashkinVWordCountMPI, InType>(kTestParam, kSettingsPath),
+                                   ppc::util::AddFuncTask<PeryashkinVWordCountSEQ, InType>(kTestParam, kSettingsPath));
 
 const auto kValues = ppc::util::ExpandToValues(kTasks);
 const auto kName = PeryashkinVWordCountRunFuncTests::PrintFuncTestName<PeryashkinVWordCountRunFuncTests>;
