@@ -112,11 +112,19 @@ struct LocalMatrix {
     const int count = layout.cols[proc];
     const int off = layout.displs[proc];
 
+    const std::size_t first_sz = static_cast<std::size_t>(first);
+    const std::size_t count_sz = static_cast<std::size_t>(count);
+    const std::size_t off_sz = static_cast<std::size_t>(off);
+    const std::size_t m_sz = static_cast<std::size_t>(layout.m);
+
     for (int row = 0; row < layout.n; ++row) {
-      const int row_src = row * layout.m;
-      const int row_dst = off + (row * count);
+      const std::size_t row_sz = static_cast<std::size_t>(row);
+      const std::size_t row_src = row_sz * m_sz;
+      const std::size_t row_dst = off_sz + (row_sz * count_sz);
+
       for (int lc = 0; lc < count; ++lc) {
-        packed[static_cast<std::size_t>(row_dst + lc)] = aug[static_cast<std::size_t>(row_src + (first + lc))];
+        const std::size_t lc_sz = static_cast<std::size_t>(lc);
+        packed[row_dst + lc_sz] = aug[row_src + first_sz + lc_sz];
       }
     }
   }
@@ -224,7 +232,7 @@ bool ForwardElimination(LocalMatrix &mat, const Layout &layout, int bw, double e
     // ВАЖНО: swap ограниченный полосой + RHS (как в SEQ PivotBand)
     SwapRowsInBand(mat, layout, k, pivot_row, k, col_end);
 
-    std::fill(multipliers.begin(), multipliers.end(), 0.0);
+    std::ranges::fill(multipliers, 0.0);
 
     if (layout.world_rank == owner_k) {
       const int local_k = LocalCol(layout, k);
@@ -368,7 +376,7 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
     return false;
   }
 
-  // ВАЖНО: output должен быть на каждом процессе (тесты проверяют на всех рангах)
+  // output должен быть на каждом процессе (тесты проверяют на всех рангах)
   GetOutput() = std::move(x);
   return true;
 }
