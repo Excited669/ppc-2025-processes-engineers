@@ -1,6 +1,10 @@
 #include "peryashkin_v_word_count/seq/include/ops_seq.hpp"
 
 #include <cctype>
+#include <cstddef>
+#include <string>
+
+#include "peryashkin_v_word_count/common/include/common.hpp"
 
 namespace peryashkin_v_word_count {
 
@@ -11,7 +15,7 @@ PeryashkinVWordCountSEQ::PeryashkinVWordCountSEQ(const InType &in) {
 }
 
 bool PeryashkinVWordCountSEQ::ValidationImpl() {
-  return GetOutput() == 0;
+  return (!GetInput().empty()) && (GetOutput() == 0);
 }
 
 bool PeryashkinVWordCountSEQ::PreProcessingImpl() {
@@ -19,19 +23,31 @@ bool PeryashkinVWordCountSEQ::PreProcessingImpl() {
 }
 
 bool PeryashkinVWordCountSEQ::RunImpl() {
-  const auto &s = GetInput();
-
-  int count = 0;
-  bool prev_space = true;
-  for (unsigned char ch : s) {
-    const bool cur_space = (std::isspace(ch) != 0);
-    if (!cur_space && prev_space) {
-      ++count;
-    }
-    prev_space = cur_space;
+  const std::string &s = GetInput();
+  if (s.empty()) {
+    return false;
   }
 
-  GetOutput() = count;
+  auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+
+  int words = 0;
+  bool in_word = false;
+  for (char ch : s) {
+    const bool space = is_space(static_cast<unsigned char>(ch));
+    if (space) {
+      if (in_word) {
+        ++words;
+        in_word = false;
+      }
+    } else {
+      in_word = true;
+    }
+  }
+  if (in_word) {
+    ++words;
+  }
+
+  GetOutput() = words;
   return true;
 }
 
