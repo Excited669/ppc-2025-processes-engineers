@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 
 #include "peryashkin_v_conjugate_gradient_sle/common/include/common.hpp"
 #include "peryashkin_v_conjugate_gradient_sle/mpi/include/ops_mpi.hpp"
@@ -14,7 +13,7 @@ namespace peryashkin_v_conjugate_gradient_sle {
 
 class PeryashkinVConjGradSlePerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
   static constexpr int kCount = 3500;
-  InType input_data_{};
+  InType input_data_;
 
   void SetUp() override {
     input_data_ = {kCount, 0};
@@ -38,13 +37,12 @@ class PeryashkinVConjGradSlePerfTests : public ppc::util::BaseRunPerfTests<InTyp
 
     double max_diff = 0.0;
     for (int i = 0; i < kCount; ++i) {
-      const auto idx = static_cast<std::size_t>(i);
-      double ax_i = 4.0 * output_data[idx];
+      double ax_i = 4.0 * output_data[static_cast<std::size_t>(i)];
       if (i > 0) {
-        ax_i += output_data[idx - 1];
+        ax_i += output_data[static_cast<std::size_t>(i - 1)];
       }
       if (i + 1 < kCount) {
-        ax_i += output_data[idx + 1];
+        ax_i += output_data[static_cast<std::size_t>(i + 1)];
       }
       max_diff = std::max(max_diff, std::fabs(ax_i - 1.0));
     }
@@ -67,6 +65,6 @@ const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, PeryashkinVConjGr
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 const auto kPerfTestName = PeryashkinVConjGradSlePerfTests::CustomPerfTestName;
 
-INSTANTIATE_TEST_SUITE_P(RunMode, PeryashkinVConjGradSlePerfTests, kGtestValues, kPerfTestName);
+INSTANTIATE_TEST_SUITE_P(RunModeTests, PeryashkinVConjGradSlePerfTests, kGtestValues, kPerfTestName);
 
 }  // namespace peryashkin_v_conjugate_gradient_sle

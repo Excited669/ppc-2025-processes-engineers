@@ -18,7 +18,7 @@ PeryashkinVConjGradSleSEQ::PeryashkinVConjGradSleSEQ(const InType &in) {
 bool PeryashkinVConjGradSleSEQ::ValidationImpl() {
   const int n = GetInput().first;
   const int variant = GetInput().second;
-  return (n > 0) && (variant >= 0) && (variant <= 2) && GetOutput().empty();
+  return (n > 0) && (variant >= 0 && variant <= 2) && GetOutput().empty();
 }
 
 bool PeryashkinVConjGradSleSEQ::PreProcessingImpl() {
@@ -28,9 +28,18 @@ bool PeryashkinVConjGradSleSEQ::PreProcessingImpl() {
 
 namespace {
 
+double Dot(const std::vector<double> &a, const std::vector<double> &b) {
+  double sum = 0.0;
+  const std::size_t sz = a.size();
+  for (std::size_t i = 0; i < sz; ++i) {
+    sum += a[i] * b[i];
+  }
+  return sum;
+}
+
 void ApplyA(const std::vector<double> &x, int variant, std::vector<double> *y) {
-  const auto n = static_cast<int>(x.size());
-  y->assign(x.size(), 0.0);
+  const int n = static_cast<int>(x.size());
+  y->assign(static_cast<std::size_t>(n), 0.0);
 
   if (variant == 1) {
     for (int i = 0; i < n; ++i) {
@@ -41,64 +50,56 @@ void ApplyA(const std::vector<double> &x, int variant, std::vector<double> *y) {
 
   if (variant == 0) {
     for (int i = 0; i < n; ++i) {
-      const auto idx = static_cast<std::size_t>(i);
-      double val = 4.0 * x[idx];
+      double val = 4.0 * x[static_cast<std::size_t>(i)];
       if (i > 0) {
-        val += x[idx - 1];
+        val += x[static_cast<std::size_t>(i - 1)];
       }
       if (i + 1 < n) {
-        val += x[idx + 1];
+        val += x[static_cast<std::size_t>(i + 1)];
       }
-      (*y)[idx] = val;
+      (*y)[static_cast<std::size_t>(i)] = val;
     }
     return;
   }
 
   // variant == 2
   for (int i = 0; i < n; ++i) {
-    const auto idx = static_cast<std::size_t>(i);
-    const int j = (n - 1) - i;
-    double val = 3.0 * x[idx];
-    if (j != i) {
-      val -= x[static_cast<std::size_t>(j)];
+    const int mirror = (n - 1) - i;
+    double val = 3.0 * x[static_cast<std::size_t>(i)];
+    if (mirror != i) {
+      val -= x[static_cast<std::size_t>(mirror)];
     }
-    (*y)[idx] = val;
+    (*y)[static_cast<std::size_t>(i)] = val;
   }
 }
 
-double Dot(const std::vector<double> &a, const std::vector<double> &b) {
-  double sum = 0.0;
-  for (std::size_t i = 0; i < a.size(); ++i) {
-    sum += a[i] * b[i];
-  }
-  return sum;
-}
+void ConjugateGradient(int n, int variant, const std::vector<double> &b, std::vector<double> *x) {
+  constexpr double kEps = 1e-7;
+  constexpr int kMaxIters = 2000;
 
-void ConjugateGradientSeq(int n, int variant, const std::vector<double> &b, std::vector<double> *x) {
-  constexpr double eps = 1e-7;
-  constexpr int max_iters = 2000;
+  x->assign(static_cast<std::size_t>(n), 0.0);
 
-  std::vector<double> r(static_cast<std::size_t>(n), 0.0);
-  std::vector<double> p(static_cast<std::size_t>(n), 0.0);
-  std::vector<double> ap(static_cast<std::size_t>(n), 0.0);
+  std::vector<double> r_vec(static_cast<std::size_t>(n), 0.0);
+  std::vector<double> p_dir(static_cast<std::size_t>(n), 0.0);
+  std::vector<double> ap_vec(static_cast<std::size_t>(n), 0.0);
 
-  ApplyA(*x, variant, &ap);
+  ApplyA(*x, variant, &ap_vec);
   for (int i = 0; i < n; ++i) {
     const auto idx = static_cast<std::size_t>(i);
-    r[idx] = b[idx] - ap[idx];
-    p[idx] = r[idx];
+    r_vec[idx] = b[idx] - ap_vec[idx];
+    p_dir[idx] = r_vec[idx];
   }
 
-  double rr = Dot(r, r);
+  double rr = Dot(r_vec, r_vec);
 
-  for (int it = 0; it < max_iters; ++it) {
-    if (std::sqrt(rr) < eps) {
+  for (int it = 0; it < kMaxIters; ++it) {
+    if (std::sqrt(rr) < kEps) {
       break;
     }
 
-    ApplyA(p, variant, &ap);
+    ApplyA(p_dir, variant, &ap_vec);
 
-    const double p_ap = Dot(p, ap);
+    const double p_ap = Dot(p_dir, ap_vec);
     if (std::fabs(p_ap) < 1e-15) {
       break;
     }
@@ -107,16 +108,16 @@ void ConjugateGradientSeq(int n, int variant, const std::vector<double> &b, std:
 
     for (int i = 0; i < n; ++i) {
       const auto idx = static_cast<std::size_t>(i);
-      (*x)[idx] += alpha * p[idx];
-      r[idx] -= alpha * ap[idx];
+      (*x)[idx] += alpha * p_dir[idx];
+      r_vec[idx] -= alpha * ap_vec[idx];
     }
 
-    const double rr_new = Dot(r, r);
+    const double rr_new = Dot(r_vec, r_vec);
     const double beta = rr_new / rr;
 
     for (int i = 0; i < n; ++i) {
       const auto idx = static_cast<std::size_t>(i);
-      p[idx] = r[idx] + (beta * p[idx]);
+      p_dir[idx] = r_vec[idx] + (beta * p_dir[idx]);
     }
 
     rr = rr_new;
@@ -128,14 +129,15 @@ void ConjugateGradientSeq(int n, int variant, const std::vector<double> &b, std:
 bool PeryashkinVConjGradSleSEQ::RunImpl() {
   const int n = GetInput().first;
   const int variant = GetInput().second;
+
   if (n <= 0) {
     return false;
   }
 
   std::vector<double> b(static_cast<std::size_t>(n), 1.0);
-  std::vector<double> x(static_cast<std::size_t>(n), 0.0);
+  std::vector<double> x;
 
-  ConjugateGradientSeq(n, variant, b, &x);
+  ConjugateGradient(n, variant, b, &x);
 
   GetOutput() = std::move(x);
   return true;
