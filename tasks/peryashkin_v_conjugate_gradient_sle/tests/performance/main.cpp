@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 #include "peryashkin_v_conjugate_gradient_sle/common/include/common.hpp"
 #include "peryashkin_v_conjugate_gradient_sle/mpi/include/ops_mpi.hpp"
@@ -37,12 +38,14 @@ class PeryashkinVConjGradSlePerfTests : public ppc::util::BaseRunPerfTests<InTyp
 
     double max_diff = 0.0;
     for (int i = 0; i < kCount; ++i) {
-      double ax_i = 4.0 * output_data[static_cast<std::size_t>(i)];
+      const auto idx = static_cast<std::size_t>(i);
+
+      double ax_i = 4.0 * output_data[idx];
       if (i > 0) {
-        ax_i += output_data[static_cast<std::size_t>(i - 1)];
+        ax_i += output_data[idx - 1];
       }
       if (i + 1 < kCount) {
-        ax_i += output_data[static_cast<std::size_t>(i + 1)];
+        ax_i += output_data[idx + 1];
       }
       max_diff = std::max(max_diff, std::fabs(ax_i - 1.0));
     }

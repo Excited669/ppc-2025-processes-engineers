@@ -100,13 +100,14 @@ void ApplyTridiagLocal(int n, int local_start, const std::vector<double> &x_loca
   y_local->assign(static_cast<std::size_t>(local_rows), 0.0);
 
   for (int i = 0; i < local_rows; ++i) {
+    const auto idx = static_cast<std::size_t>(i);
     const int global_i = local_start + i;
 
-    double val = 4.0 * x_local[static_cast<std::size_t>(i)];
+    double val = 4.0 * x_local[idx];
 
     if (global_i > 0) {
       if (i > 0) {
-        val += x_local[static_cast<std::size_t>(i - 1)];
+        val += x_local[idx - 1];
       } else {
         val += halo_left;
       }
@@ -114,13 +115,13 @@ void ApplyTridiagLocal(int n, int local_start, const std::vector<double> &x_loca
 
     if (global_i + 1 < n) {
       if (i + 1 < local_rows) {
-        val += x_local[static_cast<std::size_t>(i + 1)];
+        val += x_local[idx + 1];
       } else {
         val += halo_right;
       }
     }
 
-    (*y_local)[static_cast<std::size_t>(i)] = val;
+    (*y_local)[idx] = val;
   }
 }
 
@@ -150,11 +151,11 @@ void ApplyOperatorLocal(int n, int variant, int rank, int world_size, int local_
 
   for (int i = 0; i < local_rows; ++i) {
     const int global_i = local_start + i;
-    const int mirror = (n - 1) - global_i;
+    const int mirror_i = (n - 1) - global_i;
 
     double val = 3.0 * x_full[static_cast<std::size_t>(global_i)];
-    if (mirror != global_i) {
-      val -= x_full[static_cast<std::size_t>(mirror)];
+    if (mirror_i != global_i) {
+      val -= x_full[static_cast<std::size_t>(mirror_i)];
     }
     (*y_local)[static_cast<std::size_t>(i)] = val;
   }

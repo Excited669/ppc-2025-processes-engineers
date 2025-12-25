@@ -50,26 +50,32 @@ void ApplyA(const std::vector<double> &x, int variant, std::vector<double> *y) {
 
   if (variant == 0) {
     for (int i = 0; i < n; ++i) {
-      double val = 4.0 * x[static_cast<std::size_t>(i)];
+      const auto idx = static_cast<std::size_t>(i);
+      double val = 4.0 * x[idx];
+
       if (i > 0) {
-        val += x[static_cast<std::size_t>(i - 1)];
+        val += x[idx - 1];
       }
       if (i + 1 < n) {
-        val += x[static_cast<std::size_t>(i + 1)];
+        val += x[idx + 1];
       }
-      (*y)[static_cast<std::size_t>(i)] = val;
+
+      (*y)[idx] = val;
     }
     return;
   }
 
   // variant == 2
   for (int i = 0; i < n; ++i) {
-    const int mirror = (n - 1) - i;
-    double val = 3.0 * x[static_cast<std::size_t>(i)];
-    if (mirror != i) {
-      val -= x[static_cast<std::size_t>(mirror)];
+    const auto idx = static_cast<std::size_t>(i);
+    const int mirror_i = (n - 1) - i;
+    const auto mirror = static_cast<std::size_t>(mirror_i);
+
+    double val = 3.0 * x[idx];
+    if (mirror_i != i) {
+      val -= x[mirror];
     }
-    (*y)[static_cast<std::size_t>(i)] = val;
+    (*y)[idx] = val;
   }
 }
 
