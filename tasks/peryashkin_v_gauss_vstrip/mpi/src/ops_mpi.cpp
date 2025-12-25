@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <limits>
 #include <numeric>
+#include <ranges>
 #include <utility>
 #include <vector>
 
@@ -98,6 +99,7 @@ struct LocalMatrix {
   double &At(int row, int local_col) {
     return data[Index(row, local_col)];
   }
+
   [[nodiscard]] const double &At(int row, int local_col) const {
     return data[Index(row, local_col)];
   }
@@ -107,23 +109,24 @@ struct LocalMatrix {
   const int total = std::accumulate(layout.sendcounts.begin(), layout.sendcounts.end(), 0);
   std::vector<double> packed(static_cast<std::size_t>(total), 0.0);
 
+  const auto m_sz = static_cast<std::size_t>(layout.m);
+
   for (int proc = 0; proc < layout.world_size; ++proc) {
     const int first = layout.first_col[proc];
     const int count = layout.cols[proc];
     const int off = layout.displs[proc];
 
-    const std::size_t first_sz = static_cast<std::size_t>(first);
-    const std::size_t count_sz = static_cast<std::size_t>(count);
-    const std::size_t off_sz = static_cast<std::size_t>(off);
-    const std::size_t m_sz = static_cast<std::size_t>(layout.m);
+    const auto first_sz = static_cast<std::size_t>(first);
+    const auto count_sz = static_cast<std::size_t>(count);
+    const auto off_sz = static_cast<std::size_t>(off);
 
     for (int row = 0; row < layout.n; ++row) {
-      const std::size_t row_sz = static_cast<std::size_t>(row);
-      const std::size_t row_src = row_sz * m_sz;
-      const std::size_t row_dst = off_sz + (row_sz * count_sz);
+      const auto row_sz = static_cast<std::size_t>(row);
+      const auto row_src = row_sz * m_sz;
+      const auto row_dst = off_sz + (row_sz * count_sz);
 
       for (int lc = 0; lc < count; ++lc) {
-        const std::size_t lc_sz = static_cast<std::size_t>(lc);
+        const auto lc_sz = static_cast<std::size_t>(lc);
         packed[row_dst + lc_sz] = aug[row_src + first_sz + lc_sz];
       }
     }
@@ -132,7 +135,7 @@ struct LocalMatrix {
   return packed;
 }
 
-// ВАЖНО: как в SEQ — swap только в пределах [col_begin..col_end] + RHS (col = n)
+// swap только в пределах [col_begin..col_end] + RHS (col = n)
 void SwapRowsInBand(LocalMatrix &mat, const Layout &layout, int row_a, int row_b, int col_begin, int col_end) {
   if (row_a == row_b) {
     return;
@@ -189,7 +192,6 @@ void ApplyEliminationToLocalCols(LocalMatrix &mat, const Layout &layout, int k, 
   for (int lc = 0; lc < mat.local_cols; ++lc) {
     const int global_col = layout.my_first_col + lc;
 
-    // Обновляем только (k+1..col_end) и RHS (col=n), как в SEQ
     const bool update_coeff = (global_col >= (k + 1)) && (global_col <= col_end);
     const bool update_rhs = (global_col == layout.n);
     if (!(update_coeff || update_rhs)) {
@@ -229,22 +231,18 @@ bool ForwardElimination(LocalMatrix &mat, const Layout &layout, int bw, double e
       return false;
     }
 
-    // ВАЖНО: swap ограниченный полосой + RHS (как в SEQ PivotBand)
     SwapRowsInBand(mat, layout, k, pivot_row, k, col_end);
 
     std::ranges::fill(multipliers, 0.0);
 
+    int ok = 1;
     if (layout.world_rank == owner_k) {
       const int local_k = LocalCol(layout, k);
-      if (!ComputeMultipliers(mat, local_k, k, row_end, eps, multipliers)) {
-        // Если тут false — все должны тоже корректно завершиться
-        pivot_row = -1;
-      }
+      ok = ComputeMultipliers(mat, local_k, k, row_end, eps, multipliers) ? 1 : 0;
     }
 
-    // Сигнализируем об ошибке всем
-    MPI_Bcast(&pivot_row, 1, MPI_INT, owner_k, comm);
-    if (pivot_row < 0) {
+    MPI_Bcast(&ok, 1, MPI_INT, owner_k, comm);
+    if (ok == 0) {
       return false;
     }
 
@@ -376,7 +374,6 @@ bool PeryashkinVGaussVStripMPI::RunImpl() {
     return false;
   }
 
-  // output должен быть на каждом процессе (тесты проверяют на всех рангах)
   GetOutput() = std::move(x);
   return true;
 }
