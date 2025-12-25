@@ -2,10 +2,12 @@
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <utility>
 #include <vector>
+
+#include "peryashkin_v_conjugate_gradient_sle/common/include/common.hpp"
 
 namespace peryashkin_v_conjugate_gradient_sle {
 
@@ -21,13 +23,14 @@ bool PeryashkinVConjGradSleMPI::ValidationImpl() {
 
   int ok = 0;
   if (rank == 0) {
-    const auto [n, variant] = GetInput();
-    ok = (n > 0) && (variant >= 0 && variant <= 2) && GetOutput().empty();
-    ok = ok ? 1 : 0;
+    const int n = GetInput().first;
+    const int variant = GetInput().second;
+    const bool is_valid = (n > 0) && (variant >= 0) && (variant <= 2) && GetOutput().empty();
+    ok = is_valid ? 1 : 0;
   }
 
   MPI_Bcast(&ok, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  return ok == 1;
+  return ok != 0;
 }
 
 bool PeryashkinVConjGradSleMPI::PreProcessingImpl() {
@@ -41,118 +44,126 @@ bool PeryashkinVConjGradSleMPI::PreProcessingImpl() {
 
 namespace {
 
-void CalcRowDist(int n, int world_size, std::vector<int> *counts, std::vector<int> *displs) {
-  counts->assign(world_size, 0);
-  displs->assign(world_size, 0);
+void CalcCountsDispls(int n, int world_size, std::vector<int> *counts, std::vector<int> *displs) {
+  counts->assign(static_cast<std::size_t>(world_size), 0);
+  displs->assign(static_cast<std::size_t>(world_size), 0);
 
   const int base = n / world_size;
   const int extra = n % world_size;
 
   int disp = 0;
-  for (int p = 0; p < world_size; ++p) {
-    const int c = base + (p < extra ? 1 : 0);
-    (*counts)[p] = c;
-    (*displs)[p] = disp;
-    disp += c;
+  for (int proc = 0; proc < world_size; ++proc) {
+    const int cnt = base + ((proc < extra) ? 1 : 0);
+    (*counts)[static_cast<std::size_t>(proc)] = cnt;
+    (*displs)[static_cast<std::size_t>(proc)] = disp;
+    disp += cnt;
   }
 }
 
 double LocalDot(const std::vector<double> &a, const std::vector<double> &b) {
-  double s = 0.0;
+  double sum = 0.0;
   for (std::size_t i = 0; i < a.size(); ++i) {
-    s += a[i] * b[i];
+    sum += a[i] * b[i];
   }
-  return s;
+  return sum;
 }
 
-void ApplyA_local(int n, int variant, int rank, int world_size, int local_start, const std::vector<int> &counts,
-                  const std::vector<int> &displs, const std::vector<double> &x_local, std::vector<double> *y_local) {
+void ApplyADiagonalLocal(const std::vector<double> &x_local, std::vector<double> *y_local) {
+  y_local->assign(x_local.size(), 0.0);
+  for (std::size_t i = 0; i < x_local.size(); ++i) {
+    (*y_local)[i] = 5.0 * x_local[i];
+  }
+}
+
+void ApplyATridiagLocal(int n, int rank, int world_size, int local_start, const std::vector<double> &x_local,
+                        std::vector<double> *y_local) {
   const int local_rows = static_cast<int>(x_local.size());
-  y_local->assign(static_cast<std::size_t>(local_rows), 0.0);
+  y_local->assign(x_local.size(), 0.0);
 
-  if (variant == 1) {
-    for (int i = 0; i < local_rows; ++i) {
-      (*y_local)[static_cast<std::size_t>(i)] = 5.0 * x_local[static_cast<std::size_t>(i)];
-    }
-    return;
-  }
+  const int left_rank = (rank - 1 >= 0) ? (rank - 1) : MPI_PROC_NULL;
+  const int right_rank = (rank + 1 < world_size) ? (rank + 1) : MPI_PROC_NULL;
 
-  if (variant == 0) {
-    // halo exchange: needs neighbors for first/last local element
-    double left_ghost = 0.0;
-    double right_ghost = 0.0;
+  const double send_left = (local_rows > 0) ? x_local.front() : 0.0;
+  const double send_right = (local_rows > 0) ? x_local.back() : 0.0;
 
-    const int left_rank = (rank - 1 >= 0) ? rank - 1 : MPI_PROC_NULL;
-    const int right_rank = (rank + 1 < world_size) ? rank + 1 : MPI_PROC_NULL;
+  double recv_left = 0.0;
+  double recv_right = 0.0;
 
-    const double send_left = (local_rows > 0) ? x_local.front() : 0.0;
-    const double send_right = (local_rows > 0) ? x_local.back() : 0.0;
+  MPI_Sendrecv(&send_left, 1, MPI_DOUBLE, left_rank, 0, &recv_right, 1, MPI_DOUBLE, right_rank, 0, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+  MPI_Sendrecv(&send_right, 1, MPI_DOUBLE, right_rank, 1, &recv_left, 1, MPI_DOUBLE, left_rank, 1, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
 
-    // receive right ghost from right neighbor, send left boundary to left neighbor
-    MPI_Sendrecv(&send_left, 1, MPI_DOUBLE, left_rank, 10, &right_ghost, 1, MPI_DOUBLE, right_rank, 10, MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
+  for (int i = 0; i < local_rows; ++i) {
+    const int global_i = local_start + i;
+    const auto idx = static_cast<std::size_t>(i);
 
-    // receive left ghost from left neighbor, send right boundary to right neighbor
-    MPI_Sendrecv(&send_right, 1, MPI_DOUBLE, right_rank, 11, &left_ghost, 1, MPI_DOUBLE, left_rank, 11, MPI_COMM_WORLD,
-                 MPI_STATUS_IGNORE);
+    double val = 4.0 * x_local[idx];
 
-    for (int i = 0; i < local_rows; ++i) {
-      const int global_i = local_start + i;
-
-      double v = 4.0 * x_local[static_cast<std::size_t>(i)];
-
-      // left neighbor
-      if (global_i > 0) {
-        if (i > 0) {
-          v += x_local[static_cast<std::size_t>(i - 1)];
-        } else {
-          v += left_ghost;
-        }
+    if (global_i > 0) {
+      if (i > 0) {
+        val += x_local[idx - 1];
+      } else {
+        val += recv_left;
       }
-
-      // right neighbor
-      if (global_i + 1 < n) {
-        if (i + 1 < local_rows) {
-          v += x_local[static_cast<std::size_t>(i + 1)];
-        } else {
-          v += right_ghost;
-        }
-      }
-
-      (*y_local)[static_cast<std::size_t>(i)] = v;
     }
-    return;
-  }
 
-  // variant == 2: need x[n-1-i] -> allgather local x into global x
-  std::vector<double> x_global(static_cast<std::size_t>(n), 0.0);
-  MPI_Allgatherv(x_local.data(), local_rows, MPI_DOUBLE, x_global.data(), counts.data(), displs.data(), MPI_DOUBLE,
+    if (global_i + 1 < n) {
+      if (i + 1 < local_rows) {
+        val += x_local[idx + 1];
+      } else {
+        val += recv_right;
+      }
+    }
+
+    (*y_local)[idx] = val;
+  }
+}
+
+void ApplyACentrosymLocal(int n, int local_start, const std::vector<int> &counts, const std::vector<int> &displs,
+                          const std::vector<double> &x_local, std::vector<double> *y_local) {
+  const int local_rows = static_cast<int>(x_local.size());
+  y_local->assign(x_local.size(), 0.0);
+
+  std::vector<double> x_full(static_cast<std::size_t>(n), 0.0);
+  MPI_Allgatherv(x_local.data(), local_rows, MPI_DOUBLE, x_full.data(), counts.data(), displs.data(), MPI_DOUBLE,
                  MPI_COMM_WORLD);
 
   for (int i = 0; i < local_rows; ++i) {
     const int global_i = local_start + i;
-    const int j = n - 1 - global_i;
+    const int j = (n - 1) - global_i;
 
-    double v = 3.0 * x_local[static_cast<std::size_t>(i)];
+    const auto idx = static_cast<std::size_t>(i);
+    double val = 3.0 * x_full[static_cast<std::size_t>(global_i)];
     if (j != global_i) {
-      v -= x_global[static_cast<std::size_t>(j)];
+      val -= x_full[static_cast<std::size_t>(j)];
     }
-
-    (*y_local)[static_cast<std::size_t>(i)] = v;
+    (*y_local)[idx] = val;
   }
 }
 
-void ConjugateGradientMPI(int n, int variant, int rank, int world_size, int local_start, const std::vector<int> &counts,
+void ApplyALocal(int n, int variant, int rank, int world_size, int local_start, const std::vector<int> &counts,
+                 const std::vector<int> &displs, const std::vector<double> &x_local, std::vector<double> *y_local) {
+  if (variant == 1) {
+    ApplyADiagonalLocal(x_local, y_local);
+    return;
+  }
+  if (variant == 0) {
+    ApplyATridiagLocal(n, rank, world_size, local_start, x_local, y_local);
+    return;
+  }
+  ApplyACentrosymLocal(n, local_start, counts, displs, x_local, y_local);
+}
+
+void ConjugateGradientMpi(int n, int variant, int rank, int world_size, int local_start, const std::vector<int> &counts,
                           const std::vector<int> &displs, const std::vector<double> &b_local,
                           std::vector<double> *x_local) {
-  const double eps = 1e-7;
-  const int max_iters = std::max(2000, 2 * n);
+  constexpr double eps = 1e-7;
+  constexpr int max_iters = 2000;
 
-  const int local_rows = static_cast<int>(b_local.size());
-
-  std::vector<double> r_local = b_local;  // x=0 -> r=b
+  std::vector<double> r_local = b_local;
   std::vector<double> p_local = r_local;
-  std::vector<double> Ap_local(static_cast<std::size_t>(local_rows), 0.0);
+  std::vector<double> ap_local(static_cast<std::size_t>(b_local.size()), 0.0);
 
   double rr_local = LocalDot(r_local, r_local);
   double rr = 0.0;
@@ -163,20 +174,21 @@ void ConjugateGradientMPI(int n, int variant, int rank, int world_size, int loca
       break;
     }
 
-    ApplyA_local(n, variant, rank, world_size, local_start, counts, displs, p_local, &Ap_local);
+    ApplyALocal(n, variant, rank, world_size, local_start, counts, displs, p_local, &ap_local);
 
-    const double pAp_local = LocalDot(p_local, Ap_local);
-    double pAp = 0.0;
-    MPI_Allreduce(&pAp_local, &pAp, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    if (std::fabs(pAp) < 1e-15) {
+    const double p_ap_local = LocalDot(p_local, ap_local);
+    double p_ap = 0.0;
+    MPI_Allreduce(&p_ap_local, &p_ap, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    if (std::fabs(p_ap) < 1e-15) {
       break;
     }
 
-    const double alpha = rr / pAp;
+    const double alpha = rr / p_ap;
 
-    for (int i = 0; i < local_rows; ++i) {
-      (*x_local)[static_cast<std::size_t>(i)] += alpha * p_local[static_cast<std::size_t>(i)];
-      r_local[static_cast<std::size_t>(i)] -= alpha * Ap_local[static_cast<std::size_t>(i)];
+    for (std::size_t i = 0; i < r_local.size(); ++i) {
+      (*x_local)[i] += alpha * p_local[i];
+      r_local[i] -= alpha * ap_local[i];
     }
 
     const double rr_new_local = LocalDot(r_local, r_local);
@@ -185,9 +197,8 @@ void ConjugateGradientMPI(int n, int variant, int rank, int world_size, int loca
 
     const double beta = rr_new / rr;
 
-    for (int i = 0; i < local_rows; ++i) {
-      const std::size_t idx = static_cast<std::size_t>(i);
-      p_local[idx] = r_local[idx] + beta * p_local[idx];
+    for (std::size_t i = 0; i < p_local.size(); ++i) {
+      p_local[i] = r_local[i] + (beta * p_local[i]);
     }
 
     rr = rr_new;
@@ -218,40 +229,28 @@ bool PeryashkinVConjGradSleMPI::RunImpl() {
 
   std::vector<int> counts;
   std::vector<int> displs;
-  CalcRowDist(n, world_size, &counts, &displs);
+  CalcCountsDispls(n, world_size, &counts, &displs);
 
-  const int local_rows = counts[rank];
-  const int local_start = displs[rank];
+  const int local_rows = counts[static_cast<std::size_t>(rank)];
+  const int local_start = displs[static_cast<std::size_t>(rank)];
 
-  // b = ones (root creates full, then scatter)
-  std::vector<double> b_full;
-  if (rank == 0) {
-    b_full.assign(static_cast<std::size_t>(n), 1.0);
-  }
-
-  std::vector<double> b_local(static_cast<std::size_t>(local_rows), 0.0);
-  double *sendbuf = (rank == 0) ? b_full.data() : nullptr;
-
-  MPI_Scatterv(sendbuf, counts.data(), displs.data(), MPI_DOUBLE, b_local.data(), local_rows, MPI_DOUBLE, 0,
-               MPI_COMM_WORLD);
-
+  std::vector<double> b_local(static_cast<std::size_t>(local_rows), 1.0);
   std::vector<double> x_local(static_cast<std::size_t>(local_rows), 0.0);
 
-  ConjugateGradientMPI(n, variant, rank, world_size, local_start, counts, displs, b_local, &x_local);
+  ConjugateGradientMpi(n, variant, rank, world_size, local_start, counts, displs, b_local, &x_local);
 
-  // gather x to root
   std::vector<double> x_full;
   if (rank == 0) {
     x_full.assign(static_cast<std::size_t>(n), 0.0);
   }
 
-  double *recvbuf = (rank == 0) ? x_full.data() : nullptr;
-  MPI_Gatherv(x_local.data(), local_rows, MPI_DOUBLE, recvbuf, counts.data(), displs.data(), MPI_DOUBLE, 0,
+  MPI_Gatherv(x_local.data(), local_rows, MPI_DOUBLE, x_full.data(), counts.data(), displs.data(), MPI_DOUBLE, 0,
               MPI_COMM_WORLD);
 
   if (rank == 0) {
     GetOutput() = std::move(x_full);
   }
+
   return true;
 }
 
