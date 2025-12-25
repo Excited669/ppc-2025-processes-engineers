@@ -21,12 +21,17 @@ class PeryashkinVWordCountRunFuncTests : public ppc::util::BaseRunFuncTests<InTy
 
  protected:
   void SetUp() override {
-    TestType params = std::get<static_cast<std::size_t>(ppc::util::GTestParamIndex::kTestParams)>(GetParam());
-    std::mt19937 gen(std::get<1>(params));
-    std::uniform_int_distribution<> word_len(1, 10);
-    std::uniform_int_distribution<> chars('a', 'z');
+    const TestType params = std::get<2>(GetParam());
 
+    const int seed = std::get<1>(params);
     correct_ = std::get<2>(params);
+
+    // seed берём из параметра теста (фиксированный — норм для тестов)
+    // NOLINTNEXTLINE(cert-msc51-cpp)
+    std::mt19937 gen(static_cast<std::mt19937::result_type>(seed));
+
+    std::uniform_int_distribution<int> word_len(1, 10);
+    std::uniform_int_distribution<int> chars('a', 'z');
 
     std::string s;
     s.reserve(static_cast<std::size_t>(correct_) * 12U);
@@ -38,6 +43,7 @@ class PeryashkinVWordCountRunFuncTests : public ppc::util::BaseRunFuncTests<InTy
         s.push_back(static_cast<char>(chars(gen)));
       }
     }
+
     input_ = s;
   }
 
@@ -53,26 +59,23 @@ class PeryashkinVWordCountRunFuncTests : public ppc::util::BaseRunFuncTests<InTy
   int correct_ = 0;
 };
 
-namespace {
-
 TEST_P(PeryashkinVWordCountRunFuncTests, WordsCounting) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 3> kTestParam = {std::make_tuple("Gen_1_word_seed_123", 123, 1),
-                                            std::make_tuple("Gen_7_word_seed_123", 123, 7),
-                                            std::make_tuple("Gen_1000_word_seed_123", 123, 1000)};
+const std::array<TestType, 3> kTestParam = {
+    std::make_tuple("Gen_1_word_seed_123", 123, 1),
+    std::make_tuple("Gen_7_word_seed_123", 123, 7),
+    std::make_tuple("Gen_1000_word_seed_123", 123, 1000),
+};
 
-const std::string kSettingsPath = "tasks/peryashkin_v_word_count/settings.json";
-
-const auto kTasks = std::tuple_cat(ppc::util::AddFuncTask<PeryashkinVWordCountMPI, InType>(kTestParam, kSettingsPath),
-                                   ppc::util::AddFuncTask<PeryashkinVWordCountSEQ, InType>(kTestParam, kSettingsPath));
+const auto kTasks = std::tuple_cat(
+    ppc::util::AddFuncTask<PeryashkinVWordCountMPI, InType>(kTestParam, PPC_SETTINGS_peryashkin_v_word_count),
+    ppc::util::AddFuncTask<PeryashkinVWordCountSEQ, InType>(kTestParam, PPC_SETTINGS_peryashkin_v_word_count));
 
 const auto kValues = ppc::util::ExpandToValues(kTasks);
 const auto kName = PeryashkinVWordCountRunFuncTests::PrintFuncTestName<PeryashkinVWordCountRunFuncTests>;
 
 INSTANTIATE_TEST_SUITE_P(PeryashkinVWordCount, PeryashkinVWordCountRunFuncTests, kValues, kName);
-
-}  // namespace
 
 }  // namespace peryashkin_v_word_count

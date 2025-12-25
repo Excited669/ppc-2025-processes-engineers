@@ -1,7 +1,6 @@
 #include "peryashkin_v_word_count/seq/include/ops_seq.hpp"
 
 #include <cctype>
-#include <cstddef>
 #include <string>
 
 #include "peryashkin_v_word_count/common/include/common.hpp"
@@ -15,7 +14,8 @@ PeryashkinVWordCountSEQ::PeryashkinVWordCountSEQ(const InType &in) {
 }
 
 bool PeryashkinVWordCountSEQ::ValidationImpl() {
-  return (!GetInput().empty()) && (GetOutput() == 0);
+  // Пустая строка допустима
+  return GetOutput() == 0;
 }
 
 bool PeryashkinVWordCountSEQ::PreProcessingImpl() {
@@ -25,15 +25,15 @@ bool PeryashkinVWordCountSEQ::PreProcessingImpl() {
 bool PeryashkinVWordCountSEQ::RunImpl() {
   const std::string &s = GetInput();
   if (s.empty()) {
-    return false;
+    GetOutput() = 0;
+    return true;
   }
-
-  auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
 
   int words = 0;
   bool in_word = false;
+
   for (char ch : s) {
-    const bool space = is_space(static_cast<unsigned char>(ch));
+    const bool space = (std::isspace(static_cast<unsigned char>(ch)) != 0);
     if (space) {
       if (in_word) {
         ++words;
@@ -43,6 +43,7 @@ bool PeryashkinVWordCountSEQ::RunImpl() {
       in_word = true;
     }
   }
+
   if (in_word) {
     ++words;
   }

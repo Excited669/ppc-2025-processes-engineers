@@ -17,9 +17,10 @@ class PeryashkinVWordCountRunPerfTests : public ppc::util::BaseRunPerfTests<InTy
     const int seed = 123;
     correct_ = 1000000;
 
-    std::mt19937 gen(seed);
-    std::uniform_int_distribution<> word_len(1, 10);
-    std::uniform_int_distribution<> chars('a', 'z');
+    // NOLINTNEXTLINE(cert-msc51-cpp)
+    std::mt19937 gen(static_cast<std::mt19937::result_type>(seed));
+    std::uniform_int_distribution<int> word_len(1, 10);
+    std::uniform_int_distribution<int> chars('a', 'z');
 
     std::string s;
     s.reserve(static_cast<std::size_t>(correct_) * 12U);
@@ -31,6 +32,7 @@ class PeryashkinVWordCountRunPerfTests : public ppc::util::BaseRunPerfTests<InTy
         s.push_back(static_cast<char>(chars(gen)));
       }
     }
+
     input_ = s;
   }
 
@@ -50,10 +52,8 @@ TEST_P(PeryashkinVWordCountRunPerfTests, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const std::string kSettingsPath = "tasks/peryashkin_v_word_count/settings.json";
-
-const auto kAllPerfTasks =
-    ppc::util::MakeAllPerfTasks<InType, PeryashkinVWordCountMPI, PeryashkinVWordCountSEQ>(kSettingsPath);
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, PeryashkinVWordCountMPI, PeryashkinVWordCountSEQ>(
+    PPC_SETTINGS_peryashkin_v_word_count);
 
 const auto kValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 const auto kName = PeryashkinVWordCountRunPerfTests::CustomPerfTestName;

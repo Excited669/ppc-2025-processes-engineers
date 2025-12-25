@@ -2,8 +2,13 @@
 
 #include <mpi.h>
 
+#include <array>
 #include <cctype>
+#include <cstddef>
+#include <string>
 #include <vector>
+
+#include "peryashkin_v_word_count/common/include/common.hpp"
 
 namespace peryashkin_v_word_count {
 
@@ -23,23 +28,27 @@ LocalResult CountLocal(const std::string &part) {
     return r;
   }
 
-  r.starts_with_word = (std::isspace(static_cast<unsigned char>(part.front())) == 0);
-  r.ends_with_word = (std::isspace(static_cast<unsigned char>(part.back())) == 0);
-
   bool prev_space = true;
-  for (unsigned char ch : part) {
-    bool cur_space = (std::isspace(ch) != 0);
-    if (!cur_space && prev_space) {
+  for (char ch : part) {
+    const bool is_space = (std::isspace(static_cast<unsigned char>(ch)) != 0);
+    if (!is_space && prev_space) {
       ++r.local_count;
     }
-    prev_space = cur_space;
+    prev_space = is_space;
   }
+
+  const bool starts = (std::isspace(static_cast<unsigned char>(part.front())) == 0);
+  const bool ends = (std::isspace(static_cast<unsigned char>(part.back())) == 0);
+  r.starts_with_word = static_cast<char>(starts ? 1 : 0);
+  r.ends_with_word = static_cast<char>(ends ? 1 : 0);
+
   return r;
 }
 
 void MakeScatterPlan(int n, int size, std::vector<int> &counts, std::vector<int> &displs) {
   counts.assign(size, 0);
   displs.assign(size, 0);
+
   const int base = (size == 0) ? 0 : (n / size);
   const int rem = (size == 0) ? 0 : (n % size);
 
@@ -70,13 +79,16 @@ bool PeryashkinVWordCountMPI::PreProcessingImpl() {
 }
 
 bool PeryashkinVWordCountMPI::RunImpl() {
-  int rank = 0, size = 0;
+  int rank = 0;
+  int size = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   std::string input;
   int n = 0;
-  std::vector<int> send_counts, send_displs;
+
+  std::vector<int> send_counts;
+  std::vector<int> send_displs;
 
   if (rank == 0) {
     input = GetInput();
@@ -113,18 +125,22 @@ bool PeryashkinVWordCountMPI::RunImpl() {
   // Соберём флаги границ, чтобы скорректировать слова, разорванные по чанкам
   std::vector<char> all_flags;
   if (rank == 0) {
-    all_flags.resize(static_cast<std::size_t>(2 * size), 0);
+    const std::size_t flags_len = static_cast<std::size_t>(size) * 2U;
+    all_flags.resize(flags_len, 0);
   }
 
-  const char my_flags[2] = {lr.starts_with_word, lr.ends_with_word};
-  MPI_Gather(my_flags, 2, MPI_CHAR, rank == 0 ? all_flags.data() : nullptr, 2, MPI_CHAR, 0, MPI_COMM_WORLD);
+  const std::array<char, 2> my_flags = {lr.starts_with_word, lr.ends_with_word};
+  MPI_Gather(my_flags.data(), 2, MPI_CHAR, (rank == 0) ? all_flags.data() : nullptr, 2, MPI_CHAR, 0, MPI_COMM_WORLD);
 
   if (rank == 0) {
     // Если предыдущий чанк заканчивается внутри слова и следующий начинается внутри слова,
     // то одно слово посчитали дважды -> -1
     for (int i = 1; i < size; ++i) {
-      const char prev_end = all_flags[static_cast<std::size_t>(2 * (i - 1) + 1)];
-      const char cur_begin = all_flags[static_cast<std::size_t>(2 * i)];
+      const std::size_t prev_end_idx = (static_cast<std::size_t>(i - 1) * 2U) + 1U;  // <-- FIX: скобки
+      const std::size_t cur_begin_idx = (static_cast<std::size_t>(i) * 2U);
+
+      const char prev_end = all_flags[prev_end_idx];
+      const char cur_begin = all_flags[cur_begin_idx];
       if (prev_end == 1 && cur_begin == 1) {
         --sum;
       }
@@ -134,6 +150,7 @@ bool PeryashkinVWordCountMPI::RunImpl() {
 
   MPI_Bcast(&sum, 1, MPI_INT, 0, MPI_COMM_WORLD);
   GetOutput() = sum;
+
   return true;
 }
 
