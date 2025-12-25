@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstddef>
@@ -22,8 +23,8 @@ namespace {
 
 std::string Sanitize(std::string s) {
   for (char &ch : s) {
-    const unsigned char u = static_cast<unsigned char>(ch);
-    if (std::isalnum(u) == 0 && ch != '_') {
+    const auto u = static_cast<unsigned char>(ch);
+    if ((std::isalnum(u) == 0) && (ch != '_')) {
       ch = '_';
     }
   }
@@ -47,8 +48,8 @@ GaussBandInput LoadSystem(const std::string &filename) {
   const std::size_t total = static_cast<std::size_t>(in.n) * static_cast<std::size_t>(in.n + 1);
   in.augmented_matrix.assign(total, 0.0);
 
-  for (std::size_t i = 0; i < total; ++i) {
-    if (!(fin >> in.augmented_matrix[i])) {
+  for (std::size_t idx = 0; idx < total; ++idx) {
+    if (!(fin >> in.augmented_matrix[idx])) {
       throw std::runtime_error("Bad matrix data in: " + abs);
     }
   }
@@ -57,18 +58,19 @@ GaussBandInput LoadSystem(const std::string &filename) {
 
 bool SolveDenseRef(std::vector<double> a, int n, std::vector<double> &x) {
   const double eps = 1e-12;
-  auto id = [&](int r, int c) -> std::size_t {
-    return static_cast<std::size_t>(r) * static_cast<std::size_t>(n + 1) + static_cast<std::size_t>(c);
+
+  auto idx = [&](int row, int col) -> std::size_t {
+    return (static_cast<std::size_t>(row) * static_cast<std::size_t>(n + 1)) + static_cast<std::size_t>(col);
   };
 
   for (int k = 0; k < n; ++k) {
     int piv = k;
-    double best = std::fabs(a[id(k, k)]);
-    for (int r = k + 1; r < n; ++r) {
-      const double v = std::fabs(a[id(r, k)]);
+    double best = std::fabs(a[idx(k, k)]);
+    for (int row = k + 1; row < n; ++row) {
+      const double v = std::fabs(a[idx(row, k)]);
       if (v > best) {
         best = v;
-        piv = r;
+        piv = row;
       }
     }
     if (best < eps) {
@@ -76,31 +78,31 @@ bool SolveDenseRef(std::vector<double> a, int n, std::vector<double> &x) {
     }
 
     if (piv != k) {
-      for (int c = k; c <= n; ++c) {
-        std::swap(a[id(k, c)], a[id(piv, c)]);
+      for (int col = k; col <= n; ++col) {
+        std::swap(a[idx(k, col)], a[idx(piv, col)]);
       }
     }
 
-    const double diag = a[id(k, k)];
-    for (int r = k + 1; r < n; ++r) {
-      const double f = a[id(r, k)] / diag;
+    const double diag = a[idx(k, k)];
+    for (int row = k + 1; row < n; ++row) {
+      const double f = a[idx(row, k)] / diag;
       if (std::fabs(f) < eps) {
         continue;
       }
-      a[id(r, k)] = 0.0;
-      for (int c = k + 1; c <= n; ++c) {
-        a[id(r, c)] -= f * a[id(k, c)];
+      a[idx(row, k)] = 0.0;
+      for (int col = k + 1; col <= n; ++col) {
+        a[idx(row, col)] -= f * a[idx(k, col)];
       }
     }
   }
 
   x.assign(static_cast<std::size_t>(n), 0.0);
   for (int k = n - 1; k >= 0; --k) {
-    double rhs = a[id(k, n)];
-    for (int c = k + 1; c < n; ++c) {
-      rhs -= a[id(k, c)] * x[static_cast<std::size_t>(c)];
+    double rhs = a[idx(k, n)];
+    for (int col = k + 1; col < n; ++col) {
+      rhs -= a[idx(k, col)] * x[static_cast<std::size_t>(col)];
     }
-    const double diag = a[id(k, k)];
+    const double diag = a[idx(k, k)];
     if (std::fabs(diag) < eps) {
       return false;
     }

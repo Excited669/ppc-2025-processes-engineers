@@ -1,6 +1,7 @@
 #pragma once
 
 #include "peryashkin_v_gauss_vstrip/common/include/common.hpp"
+#include "task/include/task.hpp"
 
 namespace peryashkin_v_gauss_vstrip {
 

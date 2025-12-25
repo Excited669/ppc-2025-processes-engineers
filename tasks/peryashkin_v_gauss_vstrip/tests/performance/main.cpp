@@ -22,13 +22,13 @@ GaussBandInput MakePerfSystem(int n, int bandwidth) {
 
   std::vector<double> x_true(static_cast<std::size_t>(n), 1.0);
 
-  auto idx = [&](int r, int c) -> std::size_t {
-    return static_cast<std::size_t>(r) * static_cast<std::size_t>(n + 1) + static_cast<std::size_t>(c);
+  auto idx = [&](int row, int col) -> std::size_t {
+    return (static_cast<std::size_t>(row) * static_cast<std::size_t>(n + 1)) + static_cast<std::size_t>(col);
   };
 
   for (int i = 0; i < n; ++i) {
     for (int j = std::max(0, i - bandwidth); j <= std::min(n - 1, i + bandwidth); ++j) {
-      input.augmented_matrix[idx(i, j)] = (i == j) ? static_cast<double>(2 * bandwidth + 1) : 1.0;
+      input.augmented_matrix[idx(i, j)] = (i == j) ? static_cast<double>((2 * bandwidth) + 1) : 1.0;
     }
   }
 
